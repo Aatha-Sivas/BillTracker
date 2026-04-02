@@ -37,8 +37,8 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders
-/ios
-/android
+*/ios
+*/android
 
 # Misc
 .claude/
@@ -46,3 +46,4 @@ yarn-error.*
 /.vscode/
 CLAUDE.md
 AGENTS.md
+*.apk

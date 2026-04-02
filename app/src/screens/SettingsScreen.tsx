@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, ScrollView, View, Linking, Platform } from 'react-native';
+import { StyleSheet, ScrollView, View, Linking, Platform, type LayoutChangeEvent } from 'react-native';
 import {
   List,
   Switch,
@@ -32,6 +32,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
   const theme = useTheme();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
+  const [currencyMenuWidth, setCurrencyMenuWidth] = useState(0);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [importDialogVisible, setImportDialogVisible] = useState(false);
@@ -152,27 +153,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
         {/* Default Currency */}
         <List.Section>
           <List.Subheader>{t('settings.defaultCurrency')}</List.Subheader>
-          <Menu
-            visible={currencyMenuVisible}
-            onDismiss={() => setCurrencyMenuVisible(false)}
-            anchor={
-              <List.Item
-                title={settings.default_currency}
-                right={(props) => <List.Icon {...props} icon="chevron-down" />}
-                onPress={() => setCurrencyMenuVisible(true)}
-              />
-            }
-          >
-            <ScrollView style={{ maxHeight: 300 }}>
-              {CURRENCIES.map((cur) => (
-                <Menu.Item
-                  key={cur}
-                  title={cur}
-                  onPress={() => handleCurrencyChange(cur)}
+          <View onLayout={(e: LayoutChangeEvent) => setCurrencyMenuWidth(e.nativeEvent.layout.width)}>
+            <Menu
+              visible={currencyMenuVisible}
+              onDismiss={() => setCurrencyMenuVisible(false)}
+              contentStyle={currencyMenuWidth ? { width: currencyMenuWidth } : undefined}
+              anchor={
+                <List.Item
+                  title={settings.default_currency}
+                  right={(props) => <List.Icon {...props} icon="chevron-down" />}
+                  onPress={() => setCurrencyMenuVisible(true)}
                 />
-              ))}
-            </ScrollView>
-          </Menu>
+              }
+            >
+              <ScrollView style={{ maxHeight: 300 }}>
+                {CURRENCIES.map((cur) => (
+                  <Menu.Item
+                    key={cur}
+                    title={cur}
+                    onPress={() => handleCurrencyChange(cur)}
+                  />
+                ))}
+              </ScrollView>
+            </Menu>
+          </View>
         </List.Section>
 
         <Divider />

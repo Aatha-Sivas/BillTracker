@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, Dimensions } from 'react-native';
+import { StyleSheet, View, ScrollView, Dimensions, Pressable, type LayoutChangeEvent } from 'react-native';
 import {
   Button,
   Text,
@@ -28,6 +28,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete, 
   const [language, setLanguage] = useState(i18n.language === 'de' ? 'de' : 'en');
   const [currency, setCurrency] = useState('CHF');
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
+  const [currencyMenuWidth, setCurrencyMenuWidth] = useState(0);
 
   const handleLanguageChange = (lang: string) => {
     setLanguage(lang);
@@ -85,33 +86,39 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete, 
         <Text variant="labelLarge" style={[styles.fieldLabel, { marginTop: 20 }]}>
           {t('onboarding.selectCurrency')}
         </Text>
-        <Menu
-          visible={currencyMenuVisible}
-          onDismiss={() => setCurrencyMenuVisible(false)}
-          anchor={
-            <Button
-              mode="outlined"
-              onPress={() => setCurrencyMenuVisible(true)}
-              icon="chevron-down"
-              contentStyle={styles.currencyButtonContent}
-            >
-              {currency}
-            </Button>
-          }
-        >
-          <ScrollView style={{ maxHeight: 300 }}>
-            {CURRENCIES.map((cur) => (
-              <Menu.Item
-                key={cur}
-                title={cur}
-                onPress={() => {
-                  setCurrency(cur);
-                  setCurrencyMenuVisible(false);
-                }}
-              />
-            ))}
-          </ScrollView>
-        </Menu>
+        <View onLayout={(e: LayoutChangeEvent) => setCurrencyMenuWidth(e.nativeEvent.layout.width)}>
+          <Menu
+            visible={currencyMenuVisible}
+            onDismiss={() => setCurrencyMenuVisible(false)}
+            contentStyle={currencyMenuWidth ? { width: currencyMenuWidth } : undefined}
+            anchor={
+              <Pressable onPress={() => setCurrencyMenuVisible(true)}>
+                <View pointerEvents="none">
+                  <Button
+                    mode="outlined"
+                    icon="chevron-down"
+                    contentStyle={styles.currencyButtonContent}
+                  >
+                    {currency}
+                  </Button>
+                </View>
+              </Pressable>
+            }
+          >
+            <ScrollView style={{ maxHeight: 300 }}>
+              {CURRENCIES.map((cur) => (
+                <Menu.Item
+                  key={cur}
+                  title={cur}
+                  onPress={() => {
+                    setCurrency(cur);
+                    setCurrencyMenuVisible(false);
+                  }}
+                />
+              ))}
+            </ScrollView>
+          </Menu>
+        </View>
       </Surface>
 
       <View style={styles.buttonRow}>

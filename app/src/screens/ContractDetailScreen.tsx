@@ -18,12 +18,15 @@ import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
+import { launchDocumentScannerAsync, ResultFormatOptions } from '@infinitered/react-native-mlkit-document-scanner';
 import { getContractById, getBillsForContract, getSettings, getContractDocuments, addContractDocument, deleteContractDocument } from '../database/db';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency, formatDate, isOverdue } from '../utils/date';
 import { statusColors } from '../theme';
-import { saveProofFile, deleteProofFile, proofFileExists, getProofFullPath } from '../services/exportImport';
+import { saveProofFile, deleteProofFile, getProofFullPath } from '../services/exportImport';
 import type { Contract, Bill, BillingCycle, ContractDocument } from '../types';
 import { differenceInDays, parseISO, subDays } from 'date-fns';
 
@@ -82,17 +85,32 @@ export const ContractDetailScreen: React.FC = () => {
 
   const handleScanDocument = async () => {
     try {
-      const { launchCameraAsync, requestCameraPermissionsAsync } = await import('expo-image-picker');
-      const { status } = await requestCameraPermissionsAsync();
-      if (status !== 'granted') return;
-      const result = await launchCameraAsync({ quality: 0.85, allowsEditing: true });
-      if (result.canceled) return;
-      setPendingDocUri(result.assets[0].uri);
-      setPendingDocType('photo');
+      const result = await launchDocumentScannerAsync({
+        pageLimit: 1,
+        galleryImportAllowed: false,
+        resultFormats: ResultFormatOptions.PDF,
+      });
+      if (result.canceled || !result.pdf?.uri) return;
+      setPendingDocUri(result.pdf.uri);
+      setPendingDocType('pdf');
       setDocName('');
       setNameDialogVisible(true);
     } catch {
-      Alert.alert(t('common.error'), 'Camera not available');
+      Alert.alert(t('common.error'), 'Document scanner not available');
+    }
+  };
+
+  const handleOpenDocument = async (doc: ContractDocument) => {
+    try {
+      const fullPath = getProofFullPath(doc.path);
+      const contentUri = await FileSystem.getContentUriAsync(fullPath);
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: contentUri,
+        flags: 1,
+        type: 'application/pdf',
+      });
+    } catch {
+      Alert.alert(t('common.error'), 'Could not open document');
     }
   };
 
@@ -276,8 +294,8 @@ export const ContractDetailScreen: React.FC = () => {
                 {index > 0 && <Divider />}
                 <List.Item
                   title={doc.name}
-                  description={doc.type === 'pdf' ? 'PDF' : 'Photo'}
-                  left={(props) => <List.Icon {...props} icon={doc.type === 'pdf' ? 'file-pdf-box' : 'image'} />}
+                  description="PDF"
+                  left={(props) => <List.Icon {...props} icon="file-pdf-box" />}
                   right={() => (
                     <IconButton
                       icon="delete-outline"
@@ -286,6 +304,7 @@ export const ContractDetailScreen: React.FC = () => {
                       iconColor={theme.colors.error}
                     />
                   )}
+                  onPress={() => handleOpenDocument(doc)}
                 />
               </View>
             ))

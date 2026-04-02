@@ -44,6 +44,7 @@ import {
 } from '../types';
 import { toISODate, formatDate } from '../utils/date';
 import { parseISO } from 'date-fns';
+import { DropdownField } from '../components/DropdownField';
 
 type RouteParams = {
   AddEditContract: { contractId?: string };
@@ -89,11 +90,6 @@ export const AddEditContractScreen: React.FC = () => {
   const [language, setLanguage] = useState('en');
 
   // UI state
-  const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
-  const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
-  const [billingCycleMenuVisible, setBillingCycleMenuVisible] = useState(false);
-  const [billingDayMenuVisible, setBillingDayMenuVisible] = useState(false);
-  const [paymentMethodMenuVisible, setPaymentMethodMenuVisible] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
@@ -246,17 +242,19 @@ export const AddEditContractScreen: React.FC = () => {
 
   const handleScanDocument = async () => {
     try {
-      const { launchCameraAsync, requestCameraPermissionsAsync } = await import('expo-image-picker');
-      const { status } = await requestCameraPermissionsAsync();
-      if (status !== 'granted') return;
-      const result = await launchCameraAsync({ quality: 0.85, allowsEditing: true });
-      if (result.canceled) return;
-      setPendingDocUri(result.assets[0].uri);
-      setPendingDocType('photo');
+      const { launchDocumentScannerAsync, ResultFormatOptions } = await import('@infinitered/react-native-mlkit-document-scanner');
+      const result = await launchDocumentScannerAsync({
+        pageLimit: 1,
+        galleryImportAllowed: false,
+        resultFormats: ResultFormatOptions.PDF,
+      });
+      if (result.canceled || !result.pdf?.uri) return;
+      setPendingDocUri(result.pdf.uri);
+      setPendingDocType('pdf');
       setDocName('');
       setNameDialogVisible(true);
     } catch {
-      Alert.alert(t('common.error'), 'Camera not available');
+      Alert.alert(t('common.error'), 'Document scanner not available');
     }
   };
 
@@ -329,33 +327,22 @@ export const AddEditContractScreen: React.FC = () => {
         {errors.providerName && <HelperText type="error">{errors.providerName}</HelperText>}
 
         {/* Category */}
-        <Menu
-          visible={categoryMenuVisible}
-          onDismiss={() => setCategoryMenuVisible(false)}
-          anchor={
-            <TextInput
-              label={t('contracts.category')}
-              value={t(`categories.${category}`)}
-              mode="outlined"
-              right={<TextInput.Icon icon="chevron-down" onPress={() => setCategoryMenuVisible(true)} />}
-              left={<TextInput.Icon icon={getCategoryIcon(category)} />}
-              editable={false}
-              onPressIn={() => setCategoryMenuVisible(true)}
-            />
-          }
+        <DropdownField
+          label={t('contracts.category')}
+          value={t(`categories.${category}`)}
+          icon={getCategoryIcon(category)}
         >
-          {CATEGORIES.map((cat) => (
-            <Menu.Item
-              key={cat.key}
-              leadingIcon={cat.icon}
-              title={t(`categories.${cat.key}`)}
-              onPress={() => {
-                setCategory(cat.key);
-                setCategoryMenuVisible(false);
-              }}
-            />
-          ))}
-        </Menu>
+          {(close) =>
+            CATEGORIES.map((cat) => (
+              <Menu.Item
+                key={cat.key}
+                leadingIcon={cat.icon}
+                title={t(`categories.${cat.key}`)}
+                onPress={() => { setCategory(cat.key); close(); }}
+              />
+            ))
+          }
+        </DropdownField>
 
         {/* Amount + Currency row */}
         <View style={styles.row}>
@@ -371,91 +358,56 @@ export const AddEditContractScreen: React.FC = () => {
             {errors.amount && <HelperText type="error">{errors.amount}</HelperText>}
           </View>
           <View style={styles.currencyInput}>
-            <Menu
-              visible={currencyMenuVisible}
-              onDismiss={() => setCurrencyMenuVisible(false)}
-              anchor={
-                <TextInput
-                  label={t('contracts.currency')}
-                  value={currency}
-                  mode="outlined"
-                  right={<TextInput.Icon icon="chevron-down" onPress={() => setCurrencyMenuVisible(true)} />}
-                  editable={false}
-                  onPressIn={() => setCurrencyMenuVisible(true)}
-                />
-              }
+            <DropdownField
+              label={t('contracts.currency')}
+              value={currency}
+              maxHeight={300}
             >
-              <ScrollView style={{ maxHeight: 300 }}>
-                {CURRENCIES.map((cur) => (
+              {(close) =>
+                CURRENCIES.map((cur) => (
                   <Menu.Item
                     key={cur}
                     title={cur}
-                    onPress={() => {
-                      setCurrency(cur);
-                      setCurrencyMenuVisible(false);
-                    }}
+                    onPress={() => { setCurrency(cur); close(); }}
                   />
-                ))}
-              </ScrollView>
-            </Menu>
+                ))
+              }
+            </DropdownField>
           </View>
         </View>
 
         {/* Billing Cycle */}
-        <Menu
-          visible={billingCycleMenuVisible}
-          onDismiss={() => setBillingCycleMenuVisible(false)}
-          anchor={
-            <TextInput
-              label={t('contracts.billingCycle')}
-              value={getBillingCycleLabel(billingCycle)}
-              mode="outlined"
-              right={<TextInput.Icon icon="chevron-down" onPress={() => setBillingCycleMenuVisible(true)} />}
-              editable={false}
-              onPressIn={() => setBillingCycleMenuVisible(true)}
-            />
-          }
+        <DropdownField
+          label={t('contracts.billingCycle')}
+          value={getBillingCycleLabel(billingCycle)}
         >
-          {(['monthly', 'quarterly', 'semi-annual', 'annual'] as BillingCycle[]).map((bc) => (
-            <Menu.Item
-              key={bc}
-              title={getBillingCycleLabel(bc)}
-              onPress={() => {
-                setBillingCycle(bc);
-                setBillingCycleMenuVisible(false);
-              }}
-            />
-          ))}
-        </Menu>
+          {(close) =>
+            (['monthly', 'quarterly', 'semi-annual', 'annual'] as BillingCycle[]).map((bc) => (
+              <Menu.Item
+                key={bc}
+                title={getBillingCycleLabel(bc)}
+                onPress={() => { setBillingCycle(bc); close(); }}
+              />
+            ))
+          }
+        </DropdownField>
 
         {/* Billing Day */}
-        <Menu
-          visible={billingDayMenuVisible}
-          onDismiss={() => setBillingDayMenuVisible(false)}
-          anchor={
-            <TextInput
-              label={t('contracts.billingDay')}
-              value={billingDay.toString()}
-              mode="outlined"
-              right={<TextInput.Icon icon="chevron-down" onPress={() => setBillingDayMenuVisible(true)} />}
-              editable={false}
-              onPressIn={() => setBillingDayMenuVisible(true)}
-            />
-          }
+        <DropdownField
+          label={t('contracts.billingDay')}
+          value={billingDay.toString()}
+          maxHeight={300}
         >
-          <ScrollView style={{ maxHeight: 300 }}>
-            {BILLING_DAY_OPTIONS.map((day) => (
+          {(close) =>
+            BILLING_DAY_OPTIONS.map((day) => (
               <Menu.Item
                 key={day}
                 title={day.toString()}
-                onPress={() => {
-                  setBillingDay(day);
-                  setBillingDayMenuVisible(false);
-                }}
+                onPress={() => { setBillingDay(day); close(); }}
               />
-            ))}
-          </ScrollView>
-        </Menu>
+            ))
+          }
+        </DropdownField>
 
         {/* Start Date — tapping the field opens native date picker popup */}
         <Pressable onPress={() => setShowStartPicker(true)}>
@@ -501,40 +453,28 @@ export const AddEditContractScreen: React.FC = () => {
         )}
 
         {/* Payment Method */}
-        <Menu
-          visible={paymentMethodMenuVisible}
-          onDismiss={() => setPaymentMethodMenuVisible(false)}
-          anchor={
-            <TextInput
-              label={t('contracts.paymentMethod')}
-              value={paymentMethod ? t(`paymentMethods.${paymentMethod}`) : ''}
-              mode="outlined"
-              right={<TextInput.Icon icon="chevron-down" onPress={() => setPaymentMethodMenuVisible(true)} />}
-              editable={false}
-              onPressIn={() => setPaymentMethodMenuVisible(true)}
-              placeholder={t('common.optional')}
-            />
-          }
+        <DropdownField
+          label={t('contracts.paymentMethod')}
+          value={paymentMethod ? t(`paymentMethods.${paymentMethod}`) : ''}
+          placeholder={t('common.optional')}
         >
-          <Menu.Item
-            title={`— ${t('common.remove')} —`}
-            onPress={() => {
-              setPaymentMethod(null);
-              setPaymentMethodMenuVisible(false);
-            }}
-          />
-          <Divider />
-          {PAYMENT_METHODS.map((pm) => (
-            <Menu.Item
-              key={pm.key!}
-              title={t(pm.labelKey)}
-              onPress={() => {
-                setPaymentMethod(pm.key);
-                setPaymentMethodMenuVisible(false);
-              }}
-            />
-          ))}
-        </Menu>
+          {(close) => (
+            <>
+              <Menu.Item
+                title={`— ${t('common.remove')} —`}
+                onPress={() => { setPaymentMethod(null); close(); }}
+              />
+              <Divider />
+              {PAYMENT_METHODS.map((pm) => (
+                <Menu.Item
+                  key={pm.key!}
+                  title={t(pm.labelKey)}
+                  onPress={() => { setPaymentMethod(pm.key); close(); }}
+                />
+              ))}
+            </>
+          )}
+        </DropdownField>
 
         {/* Notes */}
         <TextInput
@@ -564,8 +504,8 @@ export const AddEditContractScreen: React.FC = () => {
                   {index > 0 && <Divider />}
                   <List.Item
                     title={doc.name}
-                    description={doc.type === 'pdf' ? 'PDF' : 'Photo'}
-                    left={(props) => <List.Icon {...props} icon={doc.type === 'pdf' ? 'file-pdf-box' : 'image'} />}
+                    description="PDF"
+                    left={(props) => <List.Icon {...props} icon="file-pdf-box" />}
                     right={() => (
                       <IconButton
                         icon="delete-outline"
@@ -582,8 +522,8 @@ export const AddEditContractScreen: React.FC = () => {
                   {(existingDocs.length > 0 || index > 0) && <Divider />}
                   <List.Item
                     title={doc.name}
-                    description={doc.type === 'pdf' ? 'PDF' : 'Photo'}
-                    left={(props) => <List.Icon {...props} icon={doc.type === 'pdf' ? 'file-pdf-box' : 'image'} />}
+                    description="PDF"
+                    left={(props) => <List.Icon {...props} icon="file-pdf-box" />}
                     right={() => (
                       <IconButton
                         icon="close"
