@@ -44,3 +44,4 @@ yarn-error.*
 .claude/
 /.idea/
 /.vscode/
+CLAUDE.md
