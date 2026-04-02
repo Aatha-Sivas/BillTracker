@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import { Directory, File } from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import JSZip from 'jszip';
 import {
@@ -63,7 +63,26 @@ export const getProofFullPath = (relativePath: string): string => {
   return `${FileSystem.documentDirectory}${relativePath}`;
 };
 
-export const exportData = async (): Promise<void> => {
+const isDirectoryPickerCancelled = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes('picker was cancelled') || message.includes('picking was cancelled');
+};
+
+export const exportData = async (): Promise<string | null> => {
+  let targetDirectory: Directory;
+  try {
+    targetDirectory = await Directory.pickDirectoryAsync();
+  } catch (error) {
+    if (isDirectoryPickerCancelled(error)) {
+      return null;
+    }
+    throw error;
+  }
+
   const settings = await getSettings();
   const contracts = await getAllContracts();
   const bills = await getAllBills();
@@ -111,19 +130,21 @@ export const exportData = async (): Promise<void> => {
     }
   }
 
-  const zipContent = await zip.generateAsync({ type: 'base64' });
+  const zipContent = await zip.generateAsync({ type: 'uint8array' });
   const date = new Date().toISOString().split('T')[0];
   const zipFileName = `billtracker_backup_${date}.zip`;
-  const zipPath = `${FileSystem.cacheDirectory}${zipFileName}`;
+  const existingFile = targetDirectory
+    .list()
+    .find((entry): entry is File => entry instanceof File && entry.name === zipFileName);
 
-  await FileSystem.writeAsStringAsync(zipPath, zipContent, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
+  if (existingFile) {
+    existingFile.delete();
+  }
 
-  await Sharing.shareAsync(zipPath, {
-    mimeType: 'application/zip',
-    dialogTitle: 'Export BillTracker Data',
-  });
+  const zipFile = targetDirectory.createFile(zipFileName, 'application/zip');
+  zipFile.write(zipContent);
+
+  return zipFile.uri;
 };
 
 export const importData = async (): Promise<boolean> => {

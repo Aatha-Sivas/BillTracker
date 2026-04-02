@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, ScrollView, Image, Alert, Dimensions } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, Alert, Dimensions, Pressable } from 'react-native';
 import {
   Appbar,
   Button,
@@ -16,15 +16,17 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { getBillById, markBillAsPaid, markBillAsUnpaid, updateBillProof, updateBillNotes, getSettings } from '../database/db';
 import { saveProofFile, deleteProofFile, proofFileExists, getProofFullPath } from '../services/exportImport';
 import { cancelBillNotifications } from '../services/notifications';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { StatusBadge } from '../components/StatusBadge';
-import { formatCurrency, formatDate, getDueDateLabel } from '../utils/date';
+import { formatCurrency, formatDate, getDueDateLabel, toISODate } from '../utils/date';
 import { statusColors } from '../theme';
 import type { BillWithContract } from '../types';
+import { parseISO } from 'date-fns';
 
 type RouteParams = {
   BillDetail: { billId: string };
@@ -44,6 +46,9 @@ export const BillDetailScreen: React.FC = () => {
   const [proofExists, setProofExists] = useState(false);
   const [removeProofDialogVisible, setRemoveProofDialogVisible] = useState(false);
   const [notesDialogVisible, setNotesDialogVisible] = useState(false);
+  const [paidDateDialogVisible, setPaidDateDialogVisible] = useState(false);
+  const [showPaidDatePicker, setShowPaidDatePicker] = useState(false);
+  const [selectedPaidDate, setSelectedPaidDate] = useState(toISODate(new Date()));
   const [notesInput, setNotesInput] = useState('');
 
   const loadData = useCallback(async () => {
@@ -64,9 +69,15 @@ export const BillDetailScreen: React.FC = () => {
     }, [loadData])
   );
 
+  const openMarkAsPaidDialog = () => {
+    setSelectedPaidDate(toISODate(new Date()));
+    setPaidDateDialogVisible(true);
+  };
+
   const handleMarkAsPaid = async () => {
     if (!bill) return;
-    await markBillAsPaid(bill.id);
+    setPaidDateDialogVisible(false);
+    await markBillAsPaid(bill.id, selectedPaidDate);
     await cancelBillNotifications(bill.id);
     loadData();
   };
@@ -225,7 +236,7 @@ export const BillDetailScreen: React.FC = () => {
           <Button
             mode="contained"
             icon="check-circle"
-            onPress={handleMarkAsPaid}
+            onPress={openMarkAsPaidDialog}
             style={styles.actionButton}
             buttonColor={statusColors.paid}
             textColor="#FFFFFF"
@@ -309,7 +320,42 @@ export const BillDetailScreen: React.FC = () => {
         )}
       </ScrollView>
 
+      {showPaidDatePicker && (
+        <DateTimePicker
+          value={parseISO(selectedPaidDate)}
+          mode="date"
+          display="default"
+          onChange={(_event, date) => {
+            setShowPaidDatePicker(false);
+            if (date) {
+              setSelectedPaidDate(toISODate(date));
+            }
+          }}
+        />
+      )}
+
       <Portal>
+        <Dialog visible={paidDateDialogVisible} onDismiss={() => setPaidDateDialogVisible(false)}>
+          <Dialog.Title>{t('bills.markAsPaid')}</Dialog.Title>
+          <Dialog.Content>
+            <Pressable onPress={() => setShowPaidDatePicker(true)}>
+              <View pointerEvents="none">
+                <TextInput
+                  label={t('bills.paymentDate')}
+                  value={formatDate(selectedPaidDate, language)}
+                  mode="outlined"
+                  right={<TextInput.Icon icon="calendar" />}
+                  editable={false}
+                />
+              </View>
+            </Pressable>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setPaidDateDialogVisible(false)}>{t('common.cancel')}</Button>
+            <Button onPress={handleMarkAsPaid}>{t('common.confirm')}</Button>
+          </Dialog.Actions>
+        </Dialog>
+
         <Dialog visible={removeProofDialogVisible} onDismiss={() => setRemoveProofDialogVisible(false)}>
           <Dialog.Title>{t('bills.removeProof')}</Dialog.Title>
           <Dialog.Content>

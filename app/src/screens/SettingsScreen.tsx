@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, ScrollView, View, Linking, Platform, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, ScrollView, View } from 'react-native';
 import {
   List,
   Switch,
@@ -7,7 +7,6 @@ import {
   Text,
   Divider,
   Menu,
-  TextInput,
   Button,
   Snackbar,
   Portal,
@@ -21,6 +20,11 @@ import { exportData, importData } from '../services/exportImport';
 import { requestNotificationPermissions } from '../services/notifications';
 import { CURRENCIES, type ThemeMode } from '../types';
 import type { Settings } from '../types';
+import { DropdownField } from '../components/DropdownField';
+
+const BILL_LOOKAHEAD_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1);
+const REMIND_BEFORE_DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => index);
+const OVERDUE_INTERVAL_OPTIONS = Array.from({ length: 30 }, (_, index) => index + 1);
 
 interface SettingsScreenProps {
   onThemeChange?: (mode: ThemeMode) => void;
@@ -31,12 +35,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
-  const [currencyMenuWidth, setCurrencyMenuWidth] = useState(0);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [importDialogVisible, setImportDialogVisible] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const [, setImporting] = useState(false);
 
   const loadSettings = useCallback(async () => {
     const s = await getSettings();
@@ -56,7 +58,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
 
   const handleCurrencyChange = async (cur: string) => {
     await updateSetting('default_currency', cur);
-    setCurrencyMenuVisible(false);
   };
 
   const handleLanguageChange = async (lang: string) => {
@@ -72,7 +73,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
 
   const handleExport = async () => {
     try {
-      await exportData();
+      const exportPath = await exportData();
+      if (!exportPath) {
+        return;
+      }
       setSnackbarMessage(t('settings.exportSuccess'));
       setSnackbarVisible(true);
     } catch {
@@ -153,29 +157,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
         {/* Default Currency */}
         <List.Section>
           <List.Subheader>{t('settings.defaultCurrency')}</List.Subheader>
-          <View onLayout={(e: LayoutChangeEvent) => setCurrencyMenuWidth(e.nativeEvent.layout.width)}>
-            <Menu
-              visible={currencyMenuVisible}
-              onDismiss={() => setCurrencyMenuVisible(false)}
-              contentStyle={currencyMenuWidth ? { width: currencyMenuWidth } : undefined}
-              anchor={
-                <List.Item
-                  title={settings.default_currency}
-                  right={(props) => <List.Icon {...props} icon="chevron-down" />}
-                  onPress={() => setCurrencyMenuVisible(true)}
-                />
-              }
+          <View style={styles.dropdownField}>
+            <DropdownField
+              label={t('settings.defaultCurrency')}
+              value={settings.default_currency}
+              maxHeight={300}
             >
-              <ScrollView style={{ maxHeight: 300 }}>
-                {CURRENCIES.map((cur) => (
+              {(close) =>
+                CURRENCIES.map((cur) => (
                   <Menu.Item
                     key={cur}
                     title={cur}
-                    onPress={() => handleCurrencyChange(cur)}
+                    onPress={() => {
+                      handleCurrencyChange(cur);
+                      close();
+                    }}
                   />
-                ))}
-              </ScrollView>
-            </Menu>
+                ))
+              }
+            </DropdownField>
           </View>
         </List.Section>
 
@@ -184,22 +184,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
         {/* Bills Lookahead */}
         <List.Section>
           <List.Subheader>{t('settings.billsLookahead')}</List.Subheader>
-          <List.Item
-            title={t('settings.billsLookaheadMonths')}
-            right={() => (
-              <TextInput
-                value={settings.bills_lookahead_months.toString()}
-                onChangeText={(v) => {
-                  const num = parseInt(v, 10);
-                  if (!isNaN(num) && num >= 1 && num <= 12) updateSetting('bills_lookahead_months', num);
-                }}
-                keyboardType="number-pad"
-                mode="outlined"
-                style={styles.numberInput}
-                dense
-              />
-            )}
-          />
+          <View style={styles.dropdownField}>
+            <DropdownField
+              label={t('settings.billsLookaheadMonths')}
+              value={settings.bills_lookahead_months.toString()}
+              maxHeight={300}
+            >
+              {(close) =>
+                BILL_LOOKAHEAD_OPTIONS.map((months) => (
+                  <Menu.Item
+                    key={months}
+                    title={months.toString()}
+                    onPress={() => {
+                      updateSetting('bills_lookahead_months', months);
+                      close();
+                    }}
+                  />
+                ))
+              }
+            </DropdownField>
+          </View>
         </List.Section>
 
         <Divider />
@@ -218,22 +222,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
           />
           {settings.reminders_enabled === 1 && (
             <>
-              <List.Item
-                title={t('settings.remindBeforeDays')}
-                right={() => (
-                  <TextInput
-                    value={settings.remind_before_days.toString()}
-                    onChangeText={(v) => {
-                      const num = parseInt(v, 10);
-                      if (!isNaN(num) && num >= 0) updateSetting('remind_before_days', num);
-                    }}
-                    keyboardType="number-pad"
-                    mode="outlined"
-                    style={styles.numberInput}
-                    dense
-                  />
-                )}
-              />
+              <View style={styles.dropdownField}>
+                <DropdownField
+                  label={t('settings.remindBeforeDays')}
+                  value={settings.remind_before_days.toString()}
+                  maxHeight={300}
+                >
+                  {(close) =>
+                    REMIND_BEFORE_DAY_OPTIONS.map((days) => (
+                      <Menu.Item
+                        key={days}
+                        title={days.toString()}
+                        onPress={() => {
+                          updateSetting('remind_before_days', days);
+                          close();
+                        }}
+                      />
+                    ))
+                  }
+                </DropdownField>
+              </View>
               <List.Item
                 title={t('settings.remindOnDueDate')}
                 right={() => (
@@ -253,22 +261,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onThemeChange, o
                 )}
               />
               {settings.remind_when_overdue === 1 && (
-                <List.Item
-                  title={t('settings.overdueReminderInterval')}
-                  right={() => (
-                    <TextInput
-                      value={settings.overdue_reminder_interval_days.toString()}
-                      onChangeText={(v) => {
-                        const num = parseInt(v, 10);
-                        if (!isNaN(num) && num >= 1) updateSetting('overdue_reminder_interval_days', num);
-                      }}
-                      keyboardType="number-pad"
-                      mode="outlined"
-                      style={styles.numberInput}
-                      dense
-                    />
-                  )}
-                />
+                <View style={styles.dropdownField}>
+                  <DropdownField
+                    label={t('settings.overdueReminderInterval')}
+                    value={settings.overdue_reminder_interval_days.toString()}
+                    maxHeight={300}
+                  >
+                    {(close) =>
+                      OVERDUE_INTERVAL_OPTIONS.map((days) => (
+                        <Menu.Item
+                          key={days}
+                          title={days.toString()}
+                          onPress={() => {
+                            updateSetting('overdue_reminder_interval_days', days);
+                            close();
+                          }}
+                        />
+                      ))
+                    }
+                  </DropdownField>
+                </View>
               )}
             </>
           )}
@@ -343,9 +355,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 8,
   },
-  numberInput: {
-    width: 60,
-    height: 36,
-    textAlign: 'center',
+  dropdownField: {
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
 });

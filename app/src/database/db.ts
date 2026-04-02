@@ -142,7 +142,7 @@ export const deleteContract = async (id: string): Promise<void> => {
 export const getBillsForContract = async (contractId: string): Promise<Bill[]> => {
   const database = await getDatabase();
   return database.getAllAsync<Bill>(
-    'SELECT * FROM bills WHERE contract_id = ? ORDER BY due_date DESC',
+    'SELECT * FROM bills WHERE contract_id = ? ORDER BY due_date ASC',
     [contractId]
   );
 };
@@ -206,14 +206,14 @@ export const createBill = async (
   }
 };
 
-export const markBillAsPaid = async (id: string): Promise<void> => {
+export const markBillAsPaid = async (id: string, paidDate?: string): Promise<void> => {
   const database = await getDatabase();
   const now = toISODateTime(new Date());
-  const today = toISODate(new Date());
+  const paymentDate = paidDate ?? toISODate(new Date());
 
   await database.runAsync(
     `UPDATE bills SET status = 'paid', paid_date = ?, updated_at = ? WHERE id = ?`,
-    [today, now, id]
+    [paymentDate, now, id]
   );
 };
 
