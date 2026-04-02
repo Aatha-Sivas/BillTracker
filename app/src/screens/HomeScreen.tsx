@@ -144,14 +144,14 @@ export const HomeScreen: React.FC = () => {
           icon="receipt"
           title={t('home.noBills')}
           description={t('home.noBillsDesc')}
-          actionLabel={t('home.addContract')}
-          onAction={() => navigation.navigate('AddContract')}
+          actionLabel={t('addBill.title')}
+          onAction={() => navigation.navigate('AddBill')}
         />
         <FAB
           icon="plus"
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
           color={theme.colors.onPrimary}
-          onPress={() => navigation.navigate('AddContract')}
+          onPress={() => navigation.navigate('AddBill')}
         />
       </View>
     );
@@ -191,7 +191,7 @@ export const HomeScreen: React.FC = () => {
         icon="plus"
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.colors.onPrimary}
-        onPress={() => navigation.navigate('AddContract')}
+        onPress={() => navigation.navigate('AddBill')}
       />
     </View>
   );

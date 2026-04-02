@@ -58,7 +58,7 @@ export interface Contract {
 
 export interface Bill {
   id: string;
-  contract_id: string;
+  contract_id: string | null;
   due_date: string;
   status: BillStatus;
   paid_date: string | null;
@@ -67,6 +67,8 @@ export interface Bill {
   proof_type: ProofType;
   proof_path: string | null;
   notes: string | null;
+  provider_name: string | null;
+  category: Category | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,6 +85,16 @@ export interface ContractDocument {
 export interface BillWithContract extends Bill {
   provider_name: string;
   category: Category;
+  contract_amount: number | null;
+}
+
+export interface ProviderSummary {
+  provider_name: string;
+  category: Category;
+  bill_count: number;
+  next_due_date: string | null;
+  overdue_count: number;
+  all_paid: boolean;
 }
 
 export interface ContractWithBillSummary extends Contract {
@@ -122,4 +134,9 @@ export interface ExportData {
   contracts: Contract[];
   bills: Bill[];
   documents: ContractDocument[];
+}
+
+export interface Provider {
+  name: string;
+  category: Category;
 }

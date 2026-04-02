@@ -9,6 +9,9 @@ import type {
   ContractWithBillSummary,
   ThemeMode,
   ContractDocument,
+  Category,
+  Provider,
+  ProviderSummary,
 } from '../types';
 import * as Crypto from 'expo-crypto';
 import { toISODateTime, toISODate } from '../utils/date';
@@ -141,19 +144,26 @@ export const deleteContract = async (id: string): Promise<void> => {
 // Bills
 export const getBillsForContract = async (contractId: string): Promise<Bill[]> => {
   const database = await getDatabase();
-  return database.getAllAsync<Bill>(
-    'SELECT * FROM bills WHERE contract_id = ? ORDER BY due_date ASC',
-    [contractId]
-  );
+  // Also include standalone bills whose provider matches this contract's provider,
+  // so one-time bills don't vanish when a contract is created for the same provider.
+  return database.getAllAsync<Bill>(`
+    SELECT * FROM bills
+    WHERE contract_id = ?
+       OR (contract_id IS NULL AND provider_name = (SELECT provider_name FROM contracts WHERE id = ?))
+    ORDER BY due_date ASC
+  `, [contractId, contractId]);
 };
 
 export const getUpcomingBills = async (lookaheadMonths: number = 3): Promise<BillWithContract[]> => {
   const database = await getDatabase();
   const cutoff = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() + lookaheadMonths + 1, 0));
   return database.getAllAsync<BillWithContract>(`
-    SELECT b.*, c.provider_name, c.category
+    SELECT b.*,
+      COALESCE(c.provider_name, b.provider_name) as provider_name,
+      COALESCE(c.category, b.category) as category,
+      c.amount as contract_amount
     FROM bills b
-    JOIN contracts c ON b.contract_id = c.id
+    LEFT JOIN contracts c ON b.contract_id = c.id
     WHERE (b.status = 'pending' AND b.due_date <= ?) OR (b.status = 'pending' AND b.due_date < date('now')) OR (b.status = 'paid' AND b.paid_date >= date('now', '-7 days'))
     ORDER BY
       CASE WHEN b.status = 'pending' AND b.due_date < date('now') THEN 0
@@ -166,9 +176,12 @@ export const getUpcomingBills = async (lookaheadMonths: number = 3): Promise<Bil
 export const getBillById = async (id: string): Promise<BillWithContract | null> => {
   const database = await getDatabase();
   return database.getFirstAsync<BillWithContract>(`
-    SELECT b.*, c.provider_name, c.category
+    SELECT b.*,
+      COALESCE(c.provider_name, b.provider_name) as provider_name,
+      COALESCE(c.category, b.category) as category,
+      c.amount as contract_amount
     FROM bills b
-    JOIN contracts c ON b.contract_id = c.id
+    LEFT JOIN contracts c ON b.contract_id = c.id
     WHERE b.id = ?
   `, [id]);
 };
@@ -182,8 +195,8 @@ export const createBill = async (
 
   try {
     await database.runAsync(
-      `INSERT OR IGNORE INTO bills (id, contract_id, due_date, status, paid_date, amount, currency, proof_type, proof_path, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO bills (id, contract_id, due_date, status, paid_date, amount, currency, proof_type, proof_path, notes, provider_name, category, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         bill.contract_id,
@@ -195,6 +208,8 @@ export const createBill = async (
         bill.proof_type,
         bill.proof_path,
         bill.notes,
+        bill.provider_name ?? null,
+        bill.category ?? null,
         now,
         now,
       ]
@@ -327,6 +342,110 @@ export const bulkInsertContractDocuments = async (docs: ContractDocument[]): Pro
   }
 };
 
+// Quick / standalone bills
+export const createQuickBill = async (bill: {
+  provider_name: string;
+  category: Category;
+  amount: number;
+  currency: string;
+  due_date: string;
+  notes: string | null;
+}): Promise<string> => {
+  const database = await getDatabase();
+  const id = Crypto.randomUUID();
+  const now = toISODateTime(new Date());
+  await database.runAsync(
+    `INSERT INTO bills (id, contract_id, due_date, status, paid_date, amount, currency, proof_type, proof_path, notes, provider_name, category, created_at, updated_at)
+     VALUES (?, NULL, ?, 'pending', NULL, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)`,
+    [id, bill.due_date, bill.amount, bill.currency, bill.notes, bill.provider_name, bill.category, now, now]
+  );
+  return id;
+};
+
+export const createBillForContract = async (
+  contractId: string,
+  dueDate: string,
+  amount: number,
+  currency: string,
+  notes: string | null,
+): Promise<string | null> => {
+  const database = await getDatabase();
+  const existing = await database.getFirstAsync<{ id: string }>(
+    'SELECT id FROM bills WHERE contract_id = ? AND due_date = ?',
+    [contractId, dueDate]
+  );
+  if (existing) return null;
+  const id = Crypto.randomUUID();
+  const now = toISODateTime(new Date());
+  await database.runAsync(
+    `INSERT INTO bills (id, contract_id, due_date, status, paid_date, amount, currency, proof_type, proof_path, notes, provider_name, category, created_at, updated_at)
+     VALUES (?, ?, ?, 'pending', NULL, ?, ?, NULL, NULL, ?, NULL, NULL, ?, ?)`,
+    [id, contractId, dueDate, amount, currency, notes, now, now]
+  );
+  return id;
+};
+
+export const updateBillAmount = async (id: string, amount: number): Promise<void> => {
+  const database = await getDatabase();
+  const now = toISODateTime(new Date());
+  await database.runAsync(
+    'UPDATE bills SET amount = ?, updated_at = ? WHERE id = ?',
+    [amount, now, id]
+  );
+};
+
+// Providers
+export const getAllProviders = async (): Promise<Provider[]> => {
+  const database = await getDatabase();
+  return database.getAllAsync<Provider>(`
+    SELECT DISTINCT provider_name as name, category FROM contracts
+    UNION
+    SELECT DISTINCT provider_name as name, category FROM bills WHERE contract_id IS NULL AND provider_name IS NOT NULL
+    ORDER BY name ASC
+  `);
+};
+
+export const getStandaloneProviders = async (): Promise<ProviderSummary[]> => {
+  const database = await getDatabase();
+  const today = toISODate(new Date());
+  return database.getAllAsync<ProviderSummary>(`
+    SELECT
+      b.provider_name,
+      b.category,
+      COUNT(*) as bill_count,
+      MIN(CASE WHEN b.status = 'pending' AND b.due_date >= ? THEN b.due_date END) as next_due_date,
+      SUM(CASE WHEN b.status = 'pending' AND b.due_date < ? THEN 1 ELSE 0 END) as overdue_count,
+      CASE WHEN SUM(CASE WHEN b.status = 'pending' THEN 1 ELSE 0 END) = 0 THEN 1 ELSE 0 END as all_paid
+    FROM bills b
+    WHERE b.contract_id IS NULL
+      AND b.provider_name IS NOT NULL
+      AND b.provider_name NOT IN (SELECT c.provider_name FROM contracts c)
+    GROUP BY b.provider_name, b.category
+    ORDER BY b.provider_name ASC
+  `, [today, today]);
+};
+
+export const getBillsForProvider = async (providerName: string): Promise<Bill[]> => {
+  const database = await getDatabase();
+  return database.getAllAsync<Bill>(
+    'SELECT * FROM bills WHERE provider_name = ? AND contract_id IS NULL ORDER BY due_date DESC',
+    [providerName]
+  );
+};
+
+export const updateProvider = async (
+  oldName: string,
+  newName: string,
+  newCategory: Category,
+): Promise<void> => {
+  const database = await getDatabase();
+  const now = toISODateTime(new Date());
+  await database.runAsync(
+    'UPDATE bills SET provider_name = ?, category = ?, updated_at = ? WHERE provider_name = ? AND contract_id IS NULL',
+    [newName, newCategory, now, oldName]
+  );
+};
+
 // Bulk operations for import/export
 export const getAllBills = async (): Promise<Bill[]> => {
   const database = await getDatabase();
@@ -372,8 +491,8 @@ export const bulkInsertBills = async (bills: Bill[]): Promise<void> => {
   const database = await getDatabase();
   for (const bill of bills) {
     await database.runAsync(
-      `INSERT INTO bills (id, contract_id, due_date, status, paid_date, amount, currency, proof_type, proof_path, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO bills (id, contract_id, due_date, status, paid_date, amount, currency, proof_type, proof_path, notes, provider_name, category, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         bill.id,
         bill.contract_id,
@@ -385,6 +504,8 @@ export const bulkInsertBills = async (bills: Bill[]): Promise<void> => {
         bill.proof_type,
         bill.proof_path,
         bill.notes,
+        bill.provider_name ?? null,
+        bill.category ?? null,
         bill.created_at,
         bill.updated_at,
       ]

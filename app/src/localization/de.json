@@ -35,7 +35,7 @@
     "pendingBills": "Ausstehende Rechnungen",
     "overdueBills": "Überfällige Rechnungen",
     "noBills": "Noch keine Rechnungen",
-    "noBillsDesc": "Fügen Sie einen Vertrag hinzu, um Rechnungen zu verfolgen.",
+    "noBillsDesc": "Fügen Sie eine Rechnung hinzu, um Zahlungen zu verfolgen.",
     "addContract": "Vertrag hinzufügen",
     "overdue": "ÜBERFÄLLIG",
     "dueToday": "Heute fällig",
@@ -134,7 +134,33 @@
     "proofNotFound": "Belegdatei nicht gefunden",
     "viewContract": "Vertrag anzeigen",
     "billNotes": "Notizen",
-    "notesPlaceholder": "Optionale Notizen für diese Rechnung..."
+    "notesPlaceholder": "Optionale Notizen für diese Rechnung...",
+    "editAmount": "Betrag ändern",
+    "contractDefault": "Vertragsvorgabe: {{amount}}",
+    "newAmount": "Neuer Betrag"
+  },
+  "addBill": {
+    "title": "Rechnung hinzufügen",
+    "oneTime": "Einmalig",
+    "fromContract": "Aus Vertrag",
+    "providerName": "Anbietername",
+    "providerNamePlaceholder": "z.B. Dr. Müller, Finanzamt",
+    "selectContract": "Vertrag auswählen",
+    "selectCategory": "Kategorie",
+    "amount": "Betrag",
+    "currency": "Währung",
+    "dueDate": "Fälligkeitsdatum",
+    "notes": "Notizen",
+    "notesPlaceholder": "Optionale Notizen...",
+    "billExists": "Für diesen Vertrag existiert bereits eine Rechnung an diesem Datum",
+    "saved": "Rechnung gespeichert"
+  },
+  "providers": {
+    "title": "Anbieter",
+    "billCount": "{{count}} Rechnungen",
+    "noBills": "Noch keine Rechnungen",
+    "editProvider": "Anbieter bearbeiten",
+    "providerName": "Anbietername"
   },
   "scanner": {
     "title": "Dokument scannen",
@@ -188,7 +214,19 @@
     "addFirstContract": "Ersten Vertrag hinzufügen",
     "addFirstContractDesc": "Richten Sie einen Vertrag ein, um Rechnungen zu verfolgen, oder überspringen Sie diesen Schritt.",
     "skipForNow": "Überspringen",
-    "letsGo": "Los geht's!"
+    "letsGo": "Los geht's!",
+    "tourQuickBillTitle": "Einzelrechnungen",
+    "tourQuickBillDesc": "Arztbesuch oder Reparatur? Tippen Sie auf + auf dem Startbildschirm, um die Rechnung direkt hinzuzufügen — kein Vertrag nötig.",
+    "tourContractsTitle": "Wiederkehrende Verträge",
+    "tourContractsDesc": "Für monatliche Abos, Miete oder Versicherungen erstellen Sie einen Vertrag. Die App generiert automatisch Rechnungen für jeden Abrechnungszyklus.",
+    "tourProvidersTitle": "Anbieter & Suche",
+    "tourProvidersDesc": "Die App merkt sich Anbieter. Vorhandene Namen werden automatisch vorgeschlagen. Finden Sie Verträge und Anbieter schnell mit der Suchleiste.",
+    "tourProofTitle": "Belege & Dokumente",
+    "tourProofDesc": "Fügen Sie Zahlungsbelege zu jeder Rechnung hinzu — Quittung scannen oder PDF importieren. Vertragsdokumente wie unterschriebene Vereinbarungen können ebenfalls gespeichert werden.",
+    "tourBackupTitle": "Backups & Erinnerungen",
+    "tourBackupDesc": "Exportieren Sie jederzeit alle Daten als ZIP-Backup über die Einstellungen. Richten Sie Erinnerungen ein, um vor Fälligkeiten oder bei Überfälligkeit benachrichtigt zu werden.",
+    "tourReadyTitle": "Alles bereit!",
+    "tourReadyDesc": "Starten Sie mit einem Vertrag für wiederkehrende Rechnungen oder tippen Sie auf + auf dem Startbildschirm für eine Einzelrechnung."
   },
   "languages": {
     "en": "English",

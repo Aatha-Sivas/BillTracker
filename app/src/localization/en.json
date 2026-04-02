@@ -35,7 +35,7 @@
     "pendingBills": "Pending bills",
     "overdueBills": "Overdue bills",
     "noBills": "No bills yet",
-    "noBillsDesc": "Add a contract to start tracking your bills.",
+    "noBillsDesc": "Add a bill to start tracking your payments.",
     "addContract": "Add Contract",
     "overdue": "OVERDUE",
     "dueToday": "Due today",
@@ -134,7 +134,33 @@
     "proofNotFound": "Proof file not found",
     "viewContract": "View Contract",
     "billNotes": "Notes",
-    "notesPlaceholder": "Optional notes for this bill..."
+    "notesPlaceholder": "Optional notes for this bill...",
+    "editAmount": "Edit Amount",
+    "contractDefault": "Contract default: {{amount}}",
+    "newAmount": "New Amount"
+  },
+  "addBill": {
+    "title": "Add Bill",
+    "oneTime": "One-time",
+    "fromContract": "From Contract",
+    "providerName": "Provider Name",
+    "providerNamePlaceholder": "e.g. Dr. Smith, Tax Office",
+    "selectContract": "Select Contract",
+    "selectCategory": "Category",
+    "amount": "Amount",
+    "currency": "Currency",
+    "dueDate": "Due Date",
+    "notes": "Notes",
+    "notesPlaceholder": "Optional notes...",
+    "billExists": "A bill already exists for this contract on that date",
+    "saved": "Bill saved"
+  },
+  "providers": {
+    "title": "Providers",
+    "billCount": "{{count}} bills",
+    "noBills": "No bills yet",
+    "editProvider": "Edit Provider",
+    "providerName": "Provider Name"
   },
   "scanner": {
     "title": "Scan Document",
@@ -188,7 +214,19 @@
     "addFirstContract": "Add Your First Contract",
     "addFirstContractDesc": "Set up a contract to start tracking bills, or skip for now.",
     "skipForNow": "Skip for now",
-    "letsGo": "Let's Go!"
+    "letsGo": "Let's Go!",
+    "tourQuickBillTitle": "Quick Bills",
+    "tourQuickBillDesc": "Got a one-time bill like a doctor's visit or a repair? Tap the + button on the home screen to add it directly — no contract needed.",
+    "tourContractsTitle": "Recurring Contracts",
+    "tourContractsDesc": "For monthly subscriptions, rent, or insurance, create a contract. The app auto-generates bills for each billing cycle so you never miss one.",
+    "tourProvidersTitle": "Providers & Search",
+    "tourProvidersDesc": "When you add bills, the app remembers providers. Existing names are suggested automatically. Find contracts and providers quickly with the search bar.",
+    "tourProofTitle": "Proof & Documents",
+    "tourProofDesc": "Attach proof of payment to any bill — scan a receipt or import a PDF. You can also store contract documents like signed agreements.",
+    "tourBackupTitle": "Backups & Reminders",
+    "tourBackupDesc": "Export all your data as a ZIP backup anytime from Settings. Set up reminders to get notified before bills are due or when they're overdue.",
+    "tourReadyTitle": "You're All Set!",
+    "tourReadyDesc": "Start by adding a contract for recurring bills, or tap + on the home screen for a quick one-time bill."
   },
   "languages": {
     "en": "English",

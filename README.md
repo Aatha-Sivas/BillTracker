@@ -1,96 +1,93 @@
 # BillTracker
 
-BillTracker is a React Native / Expo app for tracking recurring bills and contracts on-device.
+BillTracker is an Android app built with React Native and Expo for tracking bills and contracts entirely on-device. All data stays in a local SQLite database.
 
-It helps you:
+## What It Does
 
-- Track providers, billing cycles, billing days, amounts, and notes
-- Auto-generate upcoming bills from saved contracts
-- Mark bills as paid and store the actual payment date
-- Attach proof of payment and contract documents
-- Scan documents with auto-crop and store scans as PDF
-- Restore and export backups as ZIP files
-- Receive local reminders for upcoming and overdue bills
-- Use the app in English or German
+- **Quick bills** — add one-time bills (doctor visit, tax notice, repair) directly from the home screen without creating a contract
+- **Recurring contracts** — set up providers with billing cycle, amount, and dates; the app auto-generates upcoming bills each cycle
+- **Providers** — the app remembers provider names across bills and contracts with autocomplete suggestions
+- **Editable amounts** — change the amount on any individual bill (useful for variable bills like electricity) while keeping the contract default as reference
+- **Proof of payment** — attach a scanned receipt or imported PDF to any bill
+- **Contract documents** — store signed agreements and PDFs on contracts
+- **Search** — filter contracts and providers from the Contracts screen search bar
+- **Backups** — export all data (including proof files) as a ZIP and restore from backup
+- **Reminders** — local push notifications before due dates, on due dates, and for overdue bills
+- **Localization** — English and German, with locale-aware date formatting
+- **Theming** — system, light, and dark mode
 
 ## Repository Layout
 
-The actual mobile app lives in `app/`.
+The mobile app lives in `app/`.
 
-- `app/src/screens`: app screens
-- `app/src/components`: reusable UI
-- `app/src/database`: SQLite schema and CRUD
-- `app/src/services`: bill generation, backups, notifications
-- `app/src/localization`: i18n strings
-- `app/src/types`: shared types/constants
+```
+app/
+  App.tsx                         Root component, theme/language/onboarding init
+  src/
+    screens/                      App screens
+      HomeScreen.tsx              Upcoming bills with summary card
+      ContractsScreen.tsx         Contracts list with search + standalone providers
+      ContractDetailScreen.tsx    Contract info, documents, and bill list
+      BillDetailScreen.tsx        Bill info, editable amount, proof, payment actions
+      AddEditContractScreen.tsx   Create / edit contracts
+      AddBillScreen.tsx           Add quick bill or bill from contract
+      ProviderDetailScreen.tsx    Bill history for standalone providers
+      SettingsScreen.tsx          Language, theme, currency, reminders, backup
+      OnboardingScreen.tsx        Setup wizard with feature tour
+    components/                   Reusable UI (BillListItem, ContractCard, etc.)
+    database/
+      schema.ts                   Table definitions and migrations
+      db.ts                       All CRUD operations
+    services/
+      billGeneration.ts           Auto-generate bills from contracts
+      exportImport.ts             ZIP backup and restore
+      notifications.ts            Local push notification scheduling
+    localization/
+      i18n.ts                     i18next setup
+      en.json                     English strings
+      de.json                     German strings
+    types/index.ts                TypeScript interfaces and constants
+    utils/date.ts                 Date formatting, billing date generation
+    theme/index.ts                Material Design 3 light/dark themes
+    navigation/AppNavigator.tsx   Bottom tabs + stack navigator
+```
 
 ## Tech Stack
 
-- React Native 0.81 with Expo SDK 54
-- TypeScript with strict mode
+- React Native 0.81 with Expo SDK 54 (managed workflow)
+- TypeScript (strict mode)
 - SQLite via `expo-sqlite`
-- React Navigation
-- React Native Paper
-- `i18next` / `react-i18next`
-- `date-fns`
-- `expo-notifications`
-- `jszip`
-- ML Kit document scanner for auto-cropped scans
-
-## Features
-
-### Contracts
-
-- Create, edit, and delete recurring contracts
-- Set category, amount, currency, billing cycle, billing day, start/end dates, payment method, and notes
-- Add contract documents by importing PDF or scanning directly
-
-### Bills
-
-- Automatically generate bills from contract rules
-- View bill details and linked contract
-- Mark bills as paid or unpaid
-- Choose the actual payment date when marking a bill as paid
-- Add notes and proof of payment
-- Scan proof documents with auto-crop and save them as PDF
-
-### Backups
-
-- Export all data, proofs, and contract documents into a ZIP backup
-- Choose the destination directory when exporting
-- Import a ZIP backup from the device filesystem
-
-### Settings
-
-- Language: English / German
-- Theme: system / light / dark
-- Default currency
-- Bill lookahead window
-- Reminder settings for due, pre-due, and overdue notifications
+- React Navigation (bottom tabs + native stack)
+- React Native Paper (Material Design 3)
+- `i18next` / `react-i18next` for localization
+- `date-fns` for date operations
+- `expo-notifications` for local reminders
+- `jszip` for ZIP backup/restore
+- ML Kit document scanner (`@infinitered/react-native-mlkit-document-scanner`) for auto-cropped receipt scans
 
 ## Data Model
 
-SQLite tables:
+Four SQLite tables, all stored locally:
 
-- `settings`
-- `contracts`
-- `bills`
-- `contract_documents`
+| Table | Purpose |
+|---|---|
+| `settings` | App configuration (language, theme, currency, reminders) |
+| `contracts` | Recurring provider contracts with billing rules |
+| `bills` | Individual bills — linked to a contract or standalone (one-time) |
+| `contract_documents` | PDF/photo attachments on contracts |
 
-All data is stored locally on the device.
+Bills have a nullable `contract_id`. When set, the bill was auto-generated from a contract. When null, it's a standalone quick bill with its own `provider_name` and `category`.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js
+- Node.js 18+
 - npm
-- Android Studio / Android SDK for Android builds
-- An Expo dev build or Android emulator/device
+- Android Studio / Android SDK (API 34+)
+- An Expo dev build or Android device/emulator
 
 ### Install
-
-From the repository root:
 
 ```bash
 cd app
@@ -104,22 +101,29 @@ cd app
 npx expo start
 ```
 
-This project is intended primarily for Android. Some flows use Android-specific behavior such as opening PDFs with the device viewer through intents.
+Connect via an Expo dev build on your device or emulator.
 
+### Build APK
 
-## Important Expo / SDK Notes
+```bash
+cd app
+npx expo prebuild --platform android --clean
+cd android
+gradlew.bat assembleDebug
+```
 
-- Use `expo-file-system/legacy` when you need `documentDirectory`, `EncodingType`, or legacy helpers already used in the app
-- Use `SQLiteBindValue[]` for SQLite bind params
-- Use `expo-crypto` `Crypto.randomUUID()` instead of `uuid`
-- `expo-notifications` should use `shouldShowBanner: true` and `shouldShowList: true`
-- Android date selection uses `@react-native-community/datetimepicker`
+The APK is output to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-## Architecture Notes
+> **Windows note:** The project must be at a short path (e.g. `C:\BT`) for Gradle/CMake builds. Long paths under `.claude\worktrees\` will fail.
 
-- `app/src/database/db.ts`: CRUD and query layer
-- `app/src/database/schema.ts`: schema creation and lightweight migrations
-- `app/src/services/billGeneration.ts`: recurring bill generation
-- `app/src/services/exportImport.ts`: ZIP backup/export/import
-- `app/src/services/notifications.ts`: local reminders
-- `app/src/types/index.ts`: shared models and constants
+## Expo / SDK Notes
+
+- Import `expo-file-system/legacy` (not the default export) for `documentDirectory`, `EncodingType`, etc.
+- Use `SQLiteBindValue[]` for SQLite bind parameters
+- Use `expo-crypto` `Crypto.randomUUID()` instead of the `uuid` library (no Web Crypto API in React Native)
+- `expo-notifications`: use `shouldShowBanner: true, shouldShowList: true`; don't pass `channelId` in notification content
+- Android date pickers use `@react-native-community/datetimepicker`
+
+## License
+
+This project is private and not currently published under an open-source license.

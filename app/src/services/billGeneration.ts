@@ -23,6 +23,8 @@ export const generateBillsForContract = async (contract: Contract, lookaheadMont
       proof_type: null,
       proof_path: null,
       notes: null,
+      provider_name: null,
+      category: null,
     });
   }
 };

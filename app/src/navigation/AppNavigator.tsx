@@ -11,7 +11,9 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { ContractDetailScreen } from '../screens/ContractDetailScreen';
 import { BillDetailScreen } from '../screens/BillDetailScreen';
 import { AddEditContractScreen } from '../screens/AddEditContractScreen';
-import type { ThemeMode } from '../types';
+import { AddBillScreen } from '../screens/AddBillScreen';
+import { ProviderDetailScreen } from '../screens/ProviderDetailScreen';
+import type { ThemeMode, Category } from '../types';
 
 export type RootStackParamList = {
   MainTabs: undefined;
@@ -19,6 +21,8 @@ export type RootStackParamList = {
   BillDetail: { billId: string };
   AddContract: undefined;
   EditContract: { contractId: string };
+  AddBill: undefined;
+  ProviderDetail: { providerName: string; category: Category };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -113,6 +117,8 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ onThemeChange, onLan
         component={AddEditContractScreen}
         initialParams={{}}
       />
+      <Stack.Screen name="AddBill" component={AddBillScreen} />
+      <Stack.Screen name="ProviderDetail" component={ProviderDetailScreen} />
     </Stack.Navigator>
   );
 };

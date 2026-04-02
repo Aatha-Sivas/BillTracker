@@ -21,7 +21,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { launchDocumentScannerAsync, ResultFormatOptions } from '@infinitered/react-native-mlkit-document-scanner';
-import { getBillById, markBillAsPaid, markBillAsUnpaid, updateBillProof, updateBillNotes, getSettings } from '../database/db';
+import { getBillById, markBillAsPaid, markBillAsUnpaid, updateBillProof, updateBillNotes, updateBillAmount, getSettings } from '../database/db';
 import { saveProofFile, deleteProofFile, proofFileExists, getProofFullPath } from '../services/exportImport';
 import { cancelBillNotifications } from '../services/notifications';
 import { CategoryIcon } from '../components/CategoryIcon';
@@ -53,6 +53,8 @@ export const BillDetailScreen: React.FC = () => {
   const [showPaidDatePicker, setShowPaidDatePicker] = useState(false);
   const [selectedPaidDate, setSelectedPaidDate] = useState(toISODate(new Date()));
   const [notesInput, setNotesInput] = useState('');
+  const [amountDialogVisible, setAmountDialogVisible] = useState(false);
+  const [amountInput, setAmountInput] = useState('');
 
   const loadData = useCallback(async () => {
     const [b, s] = await Promise.all([getBillById(billId), getSettings()]);
@@ -154,6 +156,15 @@ export const BillDetailScreen: React.FC = () => {
     loadData();
   };
 
+  const handleSaveAmount = async () => {
+    if (!bill) return;
+    const newAmount = parseFloat(amountInput);
+    if (isNaN(newAmount) || newAmount <= 0) return;
+    setAmountDialogVisible(false);
+    await updateBillAmount(bill.id, newAmount);
+    loadData();
+  };
+
   if (!bill) return null;
 
   const proofFullPath = bill.proof_path ? getProofFullPath(bill.proof_path) : null;
@@ -171,27 +182,51 @@ export const BillDetailScreen: React.FC = () => {
           <View style={styles.headerRow}>
             <CategoryIcon category={bill.category} size={28} />
             <View style={styles.headerText}>
-              <Text
-                variant="headlineSmall"
-                onPress={() => navigation.navigate('ContractDetail', { contractId: bill.contract_id })}
-                style={{ color: theme.colors.primary }}
-              >
-                {bill.provider_name}
-              </Text>
-              <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
-                {t('bills.viewContract')} →
-              </Text>
+              {bill.contract_id ? (
+                <>
+                  <Text
+                    variant="headlineSmall"
+                    onPress={() => navigation.navigate('ContractDetail', { contractId: bill.contract_id })}
+                    style={{ color: theme.colors.primary }}
+                  >
+                    {bill.provider_name}
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
+                    {t('bills.viewContract')} →
+                  </Text>
+                </>
+              ) : (
+                <Text variant="headlineSmall">
+                  {bill.provider_name}
+                </Text>
+              )}
             </View>
           </View>
 
           <Divider style={styles.divider} />
 
-          <View style={styles.detailRow}>
+          <Pressable
+            onPress={() => {
+              setAmountInput(bill.amount.toString());
+              setAmountDialogVisible(true);
+            }}
+            style={styles.detailRow}
+          >
             <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
               {t('bills.amount')}
             </Text>
-            <Text variant="titleLarge">{formatCurrency(bill.amount, bill.currency)}</Text>
-          </View>
+            <View style={styles.rowRight}>
+              <View style={styles.amountRow}>
+                <Text variant="titleLarge">{formatCurrency(bill.amount, bill.currency)}</Text>
+                <IconButton icon="pencil-outline" size={16} style={styles.editIcon} />
+              </View>
+              {bill.contract_amount != null && bill.amount !== bill.contract_amount && (
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {t('bills.contractDefault', { amount: formatCurrency(bill.contract_amount, bill.currency) })}
+                </Text>
+              )}
+            </View>
+          </Pressable>
 
           <View style={styles.detailRow}>
             <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
@@ -398,6 +433,29 @@ export const BillDetailScreen: React.FC = () => {
             <Button onPress={handleSaveNotes}>{t('common.save')}</Button>
           </Dialog.Actions>
         </Dialog>
+
+        <Dialog visible={amountDialogVisible} onDismiss={() => setAmountDialogVisible(false)}>
+          <Dialog.Title>{t('bills.editAmount')}</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              value={amountInput}
+              onChangeText={setAmountInput}
+              mode="outlined"
+              keyboardType="decimal-pad"
+              label={t('bills.newAmount')}
+              autoFocus
+            />
+            {bill?.contract_amount != null && (
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
+                {t('bills.contractDefault', { amount: formatCurrency(bill.contract_amount, bill.currency) })}
+              </Text>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setAmountDialogVisible(false)}>{t('common.cancel')}</Button>
+            <Button onPress={handleSaveAmount}>{t('common.save')}</Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
     </View>
   );
@@ -438,6 +496,14 @@ const styles = StyleSheet.create({
   },
   notesSection: {
     marginTop: 4,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editIcon: {
+    margin: 0,
+    marginLeft: -4,
   },
   actionButton: {
     marginTop: 16,

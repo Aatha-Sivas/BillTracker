@@ -40,7 +40,7 @@ export const initializeDatabase = async (db: SQLiteDatabase): Promise<void> => {
 
     CREATE TABLE IF NOT EXISTS bills (
       id TEXT PRIMARY KEY,
-      contract_id TEXT NOT NULL,
+      contract_id TEXT,
       due_date TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       paid_date TEXT,
@@ -49,6 +49,8 @@ export const initializeDatabase = async (db: SQLiteDatabase): Promise<void> => {
       proof_type TEXT,
       proof_path TEXT,
       notes TEXT,
+      provider_name TEXT,
+      category TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE CASCADE,
@@ -70,6 +72,7 @@ export const initializeDatabase = async (db: SQLiteDatabase): Promise<void> => {
     CREATE INDEX IF NOT EXISTS idx_bills_contract_id ON bills(contract_id);
     CREATE INDEX IF NOT EXISTS idx_bills_due_date ON bills(due_date);
     CREATE INDEX IF NOT EXISTS idx_bills_status ON bills(status);
+    CREATE INDEX IF NOT EXISTS idx_bills_provider_name ON bills(provider_name);
   `);
 
   // Migration: add bills_lookahead_months if missing
@@ -79,5 +82,44 @@ export const initializeDatabase = async (db: SQLiteDatabase): Promise<void> => {
     );
   } catch {
     // Column already exists, ignore
+  }
+
+  // Migration: add provider_name, category to bills and make contract_id nullable
+  try {
+    await db.runAsync('SELECT provider_name FROM bills LIMIT 1');
+  } catch {
+    // Columns don't exist — recreate table with new schema
+    await db.execAsync(`PRAGMA foreign_keys = OFF`);
+    await db.execAsync(`
+      CREATE TABLE bills_new (
+        id TEXT PRIMARY KEY,
+        contract_id TEXT,
+        due_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        paid_date TEXT,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL,
+        proof_type TEXT,
+        proof_path TEXT,
+        notes TEXT,
+        provider_name TEXT,
+        category TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (contract_id) REFERENCES contracts(id) ON DELETE CASCADE,
+        UNIQUE(contract_id, due_date)
+      )
+    `);
+    await db.execAsync(`
+      INSERT INTO bills_new (id, contract_id, due_date, status, paid_date, amount, currency, proof_type, proof_path, notes, created_at, updated_at)
+        SELECT id, contract_id, due_date, status, paid_date, amount, currency, proof_type, proof_path, notes, created_at, updated_at FROM bills
+    `);
+    await db.execAsync(`DROP TABLE bills`);
+    await db.execAsync(`ALTER TABLE bills_new RENAME TO bills`);
+    await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_bills_contract_id ON bills(contract_id)`);
+    await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_bills_due_date ON bills(due_date)`);
+    await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_bills_status ON bills(status)`);
+    await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_bills_provider_name ON bills(provider_name)`);
+    await db.execAsync(`PRAGMA foreign_keys = ON`);
   }
 };
