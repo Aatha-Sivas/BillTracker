@@ -1,0 +1,421 @@
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, View, ScrollView, Image, Alert, Dimensions } from 'react-native';
+import {
+  Appbar,
+  Button,
+  Card,
+  Text,
+  useTheme,
+  Surface,
+  Divider,
+  IconButton,
+  Portal,
+  Dialog,
+  TextInput,
+} from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as DocumentPicker from 'expo-document-picker';
+import { getBillById, markBillAsPaid, markBillAsUnpaid, updateBillProof, updateBillNotes, getSettings } from '../database/db';
+import { saveProofFile, deleteProofFile, proofFileExists, getProofFullPath } from '../services/exportImport';
+import { cancelBillNotifications } from '../services/notifications';
+import { CategoryIcon } from '../components/CategoryIcon';
+import { StatusBadge } from '../components/StatusBadge';
+import { formatCurrency, formatDate, getDueDateLabel } from '../utils/date';
+import { statusColors } from '../theme';
+import type { BillWithContract } from '../types';
+
+type RouteParams = {
+  BillDetail: { billId: string };
+};
+
+const screenWidth = Dimensions.get('window').width;
+
+export const BillDetailScreen: React.FC = () => {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const route = useRoute<RouteProp<RouteParams, 'BillDetail'>>();
+  const { billId } = route.params;
+
+  const [bill, setBill] = useState<BillWithContract | null>(null);
+  const [language, setLanguage] = useState('en');
+  const [proofExists, setProofExists] = useState(false);
+  const [removeProofDialogVisible, setRemoveProofDialogVisible] = useState(false);
+  const [notesDialogVisible, setNotesDialogVisible] = useState(false);
+  const [notesInput, setNotesInput] = useState('');
+
+  const loadData = useCallback(async () => {
+    const [b, s] = await Promise.all([getBillById(billId), getSettings()]);
+    setBill(b);
+    setLanguage(s.language);
+    if (b?.proof_path) {
+      const exists = await proofFileExists(b.proof_path);
+      setProofExists(exists);
+    } else {
+      setProofExists(false);
+    }
+  }, [billId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  const handleMarkAsPaid = async () => {
+    if (!bill) return;
+    await markBillAsPaid(bill.id);
+    await cancelBillNotifications(bill.id);
+    loadData();
+  };
+
+  const handleUndoPayment = async () => {
+    if (!bill) return;
+    await markBillAsUnpaid(bill.id);
+    loadData();
+  };
+
+  const handleImportPdf = async () => {
+    if (!bill) return;
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    const uri = result.assets[0].uri;
+    const relativePath = await saveProofFile(uri, bill.id, 'pdf');
+    await updateBillProof(bill.id, 'pdf', relativePath);
+    loadData();
+  };
+
+  const handleScanDocument = async () => {
+    if (!bill) return;
+    // Navigate to a scanner screen or use expo-camera
+    // For now, use image picker as fallback
+    try {
+      const { launchCameraAsync, requestCameraPermissionsAsync } = await import('expo-image-picker');
+      const { status } = await requestCameraPermissionsAsync();
+      if (status !== 'granted') return;
+
+      const result = await launchCameraAsync({
+        quality: 0.85,
+        allowsEditing: true,
+      });
+
+      if (result.canceled) return;
+      const uri = result.assets[0].uri;
+      const relativePath = await saveProofFile(uri, bill.id, 'jpg');
+      await updateBillProof(bill.id, 'photo', relativePath);
+      loadData();
+    } catch {
+      Alert.alert(t('common.error'), 'Camera not available');
+    }
+  };
+
+  const handleRemoveProof = async () => {
+    if (!bill?.proof_path) return;
+    setRemoveProofDialogVisible(false);
+    await deleteProofFile(bill.proof_path);
+    await updateBillProof(bill.id, null, null);
+    loadData();
+  };
+
+  const handleSaveNotes = async () => {
+    if (!bill) return;
+    setNotesDialogVisible(false);
+    await updateBillNotes(bill.id, notesInput.trim() || null);
+    loadData();
+  };
+
+  if (!bill) return null;
+
+  const proofFullPath = bill.proof_path ? getProofFullPath(bill.proof_path) : null;
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Appbar.Header>
+        <Appbar.BackAction onPress={() => navigation.goBack()} />
+        <Appbar.Content title={t('bills.title')} />
+      </Appbar.Header>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Bill Info Card */}
+        <Surface style={[styles.card, { backgroundColor: theme.colors.elevation.level2 }]} elevation={1}>
+          <View style={styles.headerRow}>
+            <CategoryIcon category={bill.category} size={28} />
+            <View style={styles.headerText}>
+              <Text
+                variant="headlineSmall"
+                onPress={() => navigation.navigate('ContractDetail', { contractId: bill.contract_id })}
+                style={{ color: theme.colors.primary }}
+              >
+                {bill.provider_name}
+              </Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
+                {t('bills.viewContract')} →
+              </Text>
+            </View>
+          </View>
+
+          <Divider style={styles.divider} />
+
+          <View style={styles.detailRow}>
+            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+              {t('bills.amount')}
+            </Text>
+            <Text variant="titleLarge">{formatCurrency(bill.amount, bill.currency)}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+              {t('bills.dueDate')}
+            </Text>
+            <View style={styles.rowRight}>
+              <Text variant="bodyLarge">{formatDate(bill.due_date, language)}</Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                {getDueDateLabel(bill.due_date, t)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+              {t('bills.status')}
+            </Text>
+            <StatusBadge status={bill.status} dueDate={bill.due_date} />
+          </View>
+
+          {bill.paid_date && (
+            <View style={styles.detailRow}>
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+                {t('bills.paidOn', { date: '' })}
+              </Text>
+              <Text variant="bodyLarge" style={{ color: statusColors.paid }}>
+                {formatDate(bill.paid_date, language)}
+              </Text>
+            </View>
+          )}
+
+          {bill.notes && (
+            <View style={styles.notesSection}>
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+                {t('bills.billNotes')}
+              </Text>
+              <Text variant="bodyMedium" style={{ marginTop: 4 }}>{bill.notes}</Text>
+            </View>
+          )}
+
+          <Button
+            icon="note-edit"
+            mode="text"
+            onPress={() => {
+              setNotesInput(bill.notes || '');
+              setNotesDialogVisible(true);
+            }}
+            compact
+          >
+            {bill.notes ? t('common.edit') : t('common.add')} {t('bills.billNotes')}
+          </Button>
+        </Surface>
+
+        {/* Payment Action */}
+        {bill.status === 'pending' ? (
+          <Button
+            mode="contained"
+            icon="check-circle"
+            onPress={handleMarkAsPaid}
+            style={styles.actionButton}
+            buttonColor={statusColors.paid}
+            textColor="#FFFFFF"
+          >
+            {t('bills.markAsPaid')}
+          </Button>
+        ) : (
+          <Button
+            mode="outlined"
+            icon="undo"
+            onPress={handleUndoPayment}
+            style={styles.actionButton}
+          >
+            {t('bills.undoPayment')}
+          </Button>
+        )}
+
+        {/* Proof Section */}
+        <Text variant="titleMedium" style={styles.sectionTitle}>{t('bills.proof')}</Text>
+
+        {bill.proof_path && proofExists ? (
+          <Surface style={[styles.proofCard, { backgroundColor: theme.colors.elevation.level2 }]} elevation={1}>
+            {bill.proof_type === 'photo' && proofFullPath && (
+              <Image
+                source={{ uri: proofFullPath }}
+                style={styles.proofImage}
+                resizeMode="contain"
+              />
+            )}
+            {bill.proof_type === 'pdf' && (
+              <View style={styles.pdfPlaceholder}>
+                <IconButton icon="file-pdf-box" size={48} />
+                <Text variant="bodyMedium">PDF</Text>
+              </View>
+            )}
+            <View style={styles.proofActions}>
+              <Button
+                mode="text"
+                icon="swap-horizontal"
+                onPress={handleImportPdf}
+                compact
+              >
+                {t('bills.replaceProof')}
+              </Button>
+              <Button
+                mode="text"
+                icon="delete"
+                onPress={() => setRemoveProofDialogVisible(true)}
+                textColor={theme.colors.error}
+                compact
+              >
+                {t('bills.removeProof')}
+              </Button>
+            </View>
+          </Surface>
+        ) : bill.proof_path && !proofExists ? (
+          <Surface style={[styles.proofCard, { backgroundColor: theme.colors.elevation.level2 }]} elevation={1}>
+            <View style={styles.proofNotFound}>
+              <IconButton icon="file-alert" size={48} />
+              <Text variant="bodyMedium" style={{ color: theme.colors.error }}>
+                {t('bills.proofNotFound')}
+              </Text>
+            </View>
+          </Surface>
+        ) : (
+          <Surface style={[styles.proofCard, { backgroundColor: theme.colors.elevation.level2 }]} elevation={1}>
+            <View style={styles.addProofContainer}>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}>
+                {t('bills.addProof')}
+              </Text>
+              <View style={styles.proofButtons}>
+                <Button mode="outlined" icon="camera" onPress={handleScanDocument} style={styles.proofButton}>
+                  {t('bills.scanDocument')}
+                </Button>
+                <Button mode="outlined" icon="file-pdf-box" onPress={handleImportPdf} style={styles.proofButton}>
+                  {t('bills.importPdf')}
+                </Button>
+              </View>
+            </View>
+          </Surface>
+        )}
+      </ScrollView>
+
+      <Portal>
+        <Dialog visible={removeProofDialogVisible} onDismiss={() => setRemoveProofDialogVisible(false)}>
+          <Dialog.Title>{t('bills.removeProof')}</Dialog.Title>
+          <Dialog.Content>
+            <Text>{t('bills.removeProofConfirm')}</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setRemoveProofDialogVisible(false)}>{t('common.cancel')}</Button>
+            <Button onPress={handleRemoveProof} textColor={theme.colors.error}>{t('common.remove')}</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={notesDialogVisible} onDismiss={() => setNotesDialogVisible(false)}>
+          <Dialog.Title>{t('bills.billNotes')}</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              value={notesInput}
+              onChangeText={setNotesInput}
+              mode="outlined"
+              multiline
+              numberOfLines={4}
+              placeholder={t('bills.notesPlaceholder')}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setNotesDialogVisible(false)}>{t('common.cancel')}</Button>
+            <Button onPress={handleSaveNotes}>{t('common.save')}</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  card: {
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerText: {
+    flex: 1,
+  },
+  divider: {
+    marginVertical: 4,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rowRight: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  notesSection: {
+    marginTop: 4,
+  },
+  actionButton: {
+    marginTop: 16,
+  },
+  sectionTitle: {
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  proofCard: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  proofImage: {
+    width: screenWidth - 32,
+    height: 400,
+  },
+  pdfPlaceholder: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  proofNotFound: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  proofActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 8,
+  },
+  addProofContainer: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  proofButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  proofButton: {
+    flex: 1,
+  },
+});

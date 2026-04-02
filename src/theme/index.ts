@@ -1,0 +1,95 @@
+import { MD3DarkTheme, MD3LightTheme, configureFonts } from 'react-native-paper';
+import type { MD3Theme } from 'react-native-paper';
+
+const fontConfig = {
+  fontFamily: 'System',
+};
+
+export const lightTheme: MD3Theme = {
+  ...MD3LightTheme,
+  colors: {
+    ...MD3LightTheme.colors,
+    primary: '#1565C0',
+    onPrimary: '#FFFFFF',
+    primaryContainer: '#D1E4FF',
+    onPrimaryContainer: '#001D36',
+    secondary: '#545F71',
+    onSecondary: '#FFFFFF',
+    secondaryContainer: '#D8E3F8',
+    onSecondaryContainer: '#111C2B',
+    tertiary: '#6D5677',
+    onTertiary: '#FFFFFF',
+    tertiaryContainer: '#F6D9FF',
+    onTertiaryContainer: '#271430',
+    error: '#BA1A1A',
+    onError: '#FFFFFF',
+    errorContainer: '#FFDAD6',
+    onErrorContainer: '#410002',
+    background: '#F8F9FF',
+    onBackground: '#191C20',
+    surface: '#F8F9FF',
+    onSurface: '#191C20',
+    surfaceVariant: '#E0E2EC',
+    onSurfaceVariant: '#44474E',
+    outline: '#74777F',
+    outlineVariant: '#C4C6D0',
+    elevation: {
+      ...MD3LightTheme.colors.elevation,
+      level0: 'transparent',
+      level1: '#F0F4FF',
+      level2: '#E8EEFF',
+      level3: '#E1E8FF',
+      level4: '#DEE6FF',
+      level5: '#D9E2FF',
+    },
+  },
+  fonts: configureFonts({ config: fontConfig }),
+};
+
+export const darkTheme: MD3Theme = {
+  ...MD3DarkTheme,
+  colors: {
+    ...MD3DarkTheme.colors,
+    primary: '#9ECAFF',
+    onPrimary: '#003258',
+    primaryContainer: '#00497D',
+    onPrimaryContainer: '#D1E4FF',
+    secondary: '#BCC7DC',
+    onSecondary: '#263141',
+    secondaryContainer: '#3C4858',
+    onSecondaryContainer: '#D8E3F8',
+    tertiary: '#D9BDE4',
+    onTertiary: '#3D2947',
+    tertiaryContainer: '#55405E',
+    onTertiaryContainer: '#F6D9FF',
+    error: '#FFB4AB',
+    onError: '#690005',
+    errorContainer: '#93000A',
+    onErrorContainer: '#FFDAD6',
+    background: '#111318',
+    onBackground: '#E2E2E9',
+    surface: '#111318',
+    onSurface: '#E2E2E9',
+    surfaceVariant: '#44474E',
+    onSurfaceVariant: '#C4C6D0',
+    outline: '#8E9099',
+    outlineVariant: '#44474E',
+    elevation: {
+      ...MD3DarkTheme.colors.elevation,
+      level0: 'transparent',
+      level1: '#1A1C23',
+      level2: '#1F222A',
+      level3: '#252830',
+      level4: '#272A32',
+      level5: '#2B2F37',
+    },
+  },
+  fonts: configureFonts({ config: fontConfig }),
+};
+
+export const statusColors = {
+  paid: '#16A34A',
+  overdue: '#DC2626',
+  dueSoon: '#F59E0B',
+  pending: '#6B7280',
+};
