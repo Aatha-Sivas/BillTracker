@@ -92,7 +92,7 @@ export const generateBillingDates = (
   endDateStr: string | null,
   billingCycle: BillingCycle,
   billingDay: number,
-  lookaheadMonths: number = 12
+  lookaheadMonths: number = 3
 ): string[] => {
   const startDate = parseISO(startDateStr);
   const endDate = endDateStr ? parseISO(endDateStr) : null;

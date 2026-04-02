@@ -11,7 +11,7 @@ export const initializeDatabase = async (db: SQLiteDatabase): Promise<void> => {
       language TEXT NOT NULL DEFAULT 'en',
       onboarding_completed INTEGER NOT NULL DEFAULT 0,
       theme_mode TEXT NOT NULL DEFAULT 'system',
-      bills_lookahead_months INTEGER NOT NULL DEFAULT 12,
+      bills_lookahead_months INTEGER NOT NULL DEFAULT 3,
       reminders_enabled INTEGER NOT NULL DEFAULT 1,
       remind_before_days INTEGER NOT NULL DEFAULT 3,
       remind_on_due_date INTEGER NOT NULL DEFAULT 1,
@@ -75,7 +75,7 @@ export const initializeDatabase = async (db: SQLiteDatabase): Promise<void> => {
   // Migration: add bills_lookahead_months if missing
   try {
     await db.runAsync(
-      `ALTER TABLE settings ADD COLUMN bills_lookahead_months INTEGER NOT NULL DEFAULT 12`
+      `ALTER TABLE settings ADD COLUMN bills_lookahead_months INTEGER NOT NULL DEFAULT 3`
     );
   } catch {
     // Column already exists, ignore

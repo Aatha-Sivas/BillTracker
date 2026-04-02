@@ -18,6 +18,9 @@ import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
+import { launchDocumentScannerAsync, ResultFormatOptions } from '@infinitered/react-native-mlkit-document-scanner';
 import { getBillById, markBillAsPaid, markBillAsUnpaid, updateBillProof, updateBillNotes, getSettings } from '../database/db';
 import { saveProofFile, deleteProofFile, proofFileExists, getProofFullPath } from '../services/exportImport';
 import { cancelBillNotifications } from '../services/notifications';
@@ -103,25 +106,36 @@ export const BillDetailScreen: React.FC = () => {
 
   const handleScanDocument = async () => {
     if (!bill) return;
-    // Navigate to a scanner screen or use expo-camera
-    // For now, use image picker as fallback
     try {
-      const { launchCameraAsync, requestCameraPermissionsAsync } = await import('expo-image-picker');
-      const { status } = await requestCameraPermissionsAsync();
-      if (status !== 'granted') return;
-
-      const result = await launchCameraAsync({
-        quality: 0.85,
-        allowsEditing: true,
+      const result = await launchDocumentScannerAsync({
+        pageLimit: 1,
+        galleryImportAllowed: false,
+        resultFormats: ResultFormatOptions.PDF,
       });
-
-      if (result.canceled) return;
-      const uri = result.assets[0].uri;
-      const relativePath = await saveProofFile(uri, bill.id, 'jpg');
-      await updateBillProof(bill.id, 'photo', relativePath);
+      if (result.canceled || !result.pdf?.uri) return;
+      const relativePath = await saveProofFile(result.pdf.uri, bill.id, 'pdf');
+      await updateBillProof(bill.id, 'pdf', relativePath);
       loadData();
     } catch {
-      Alert.alert(t('common.error'), 'Camera not available');
+      Alert.alert(t('common.error'), 'Document scanner not available');
+    }
+  };
+
+  const handleOpenProof = async () => {
+    if (!bill?.proof_path) return;
+
+    try {
+      const fullPath = getProofFullPath(bill.proof_path);
+      const contentUri = await FileSystem.getContentUriAsync(fullPath);
+      const mimeType = bill.proof_type === 'pdf' ? 'application/pdf' : 'image/jpeg';
+
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: contentUri,
+        flags: 1,
+        type: mimeType,
+      });
+    } catch {
+      Alert.alert(t('common.error'), t('bills.proofNotFound'));
     }
   };
 
@@ -267,10 +281,10 @@ export const BillDetailScreen: React.FC = () => {
               />
             )}
             {bill.proof_type === 'pdf' && (
-              <View style={styles.pdfPlaceholder}>
+              <Pressable onPress={handleOpenProof} style={styles.pdfPlaceholder}>
                 <IconButton icon="file-pdf-box" size={48} />
                 <Text variant="bodyMedium">PDF</Text>
-              </View>
+              </Pressable>
             )}
             <View style={styles.proofActions}>
               <Button

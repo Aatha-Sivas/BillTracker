@@ -147,7 +147,7 @@ export const getBillsForContract = async (contractId: string): Promise<Bill[]> =
   );
 };
 
-export const getUpcomingBills = async (lookaheadMonths: number = 12): Promise<BillWithContract[]> => {
+export const getUpcomingBills = async (lookaheadMonths: number = 3): Promise<BillWithContract[]> => {
   const database = await getDatabase();
   const cutoff = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() + lookaheadMonths + 1, 0));
   return database.getAllAsync<BillWithContract>(`
