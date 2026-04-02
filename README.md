@@ -1,4 +1,4 @@
-# BillTracker
+# <picture><img src="./app/assets/icon.png" height="100" align="center" alt="BillTracker Logo" /></picture> BillTracker 
 
 BillTracker is an Android app built with React Native and Expo for tracking bills and contracts entirely on-device. All data stays in a local SQLite database.
 
@@ -103,18 +103,6 @@ npx expo start
 
 Connect via an Expo dev build on your device or emulator.
 
-### Build APK
-
-```bash
-cd app
-npx expo prebuild --platform android --clean
-cd android
-gradlew.bat assembleDebug
-```
-
-The APK is output to `android/app/build/outputs/apk/debug/app-debug.apk`.
-
-> **Windows note:** The project must be at a short path (e.g. `C:\BT`) for Gradle/CMake builds. Long paths under `.claude\worktrees\` will fail.
 
 ## Expo / SDK Notes
 
